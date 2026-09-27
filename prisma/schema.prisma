@@ -12,6 +12,13 @@ datasource db {
   provider = "postgresql"
 }
 
+model Users {
+  id                    Int       @id      @default(autoincrement())
+  UserName              String    @unique
+  email                 String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
 
 model BrandKit {
   id                    Int       @id      @default(autoincrement())
@@ -21,5 +28,29 @@ model BrandKit {
   LogoURL               String  
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+  createdBy             Int
 }
+
+model AssetFolder {
+  id                    Int       @id      @default(autoincrement())
+  FolderName            String    @unique
+  HeadFolderId          Int       
+  createdAt             DateTime  @default(now())
+  deletedAt             DateTime
+  createdBy             Int
+}
+
+model Assets {
+  id                    Int       @id      @default(autoincrement())
+  name                  String    @unique
+  type                  Int       
+  LogoURL               String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime
+  deletedAt             DateTime
+  tags                  String?
+  description           String?
+  usage_suggestion      String?
+}
+
 
