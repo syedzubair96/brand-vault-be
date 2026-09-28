@@ -34,9 +34,9 @@ model BrandKit {
 model AssetFolder {
   id                    Int       @id      @default(autoincrement())
   FolderName            String    @unique
-  HeadFolderId          Int       
+  HeadFolderId          Int?       
   createdAt             DateTime  @default(now())
-  deletedAt             DateTime
+  deletedAt             DateTime?
   createdBy             Int
 }
 
@@ -47,7 +47,7 @@ model Assets {
   LogoURL               String
   createdAt             DateTime  @default(now())
   updatedAt             DateTime
-  deletedAt             DateTime
+  deletedAt             DateTime?
   tags                  String?
   description           String?
   usage_suggestion      String?

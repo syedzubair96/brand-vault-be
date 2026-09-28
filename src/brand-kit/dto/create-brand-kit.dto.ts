@@ -1,6 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsPositive,
+  IsString,
+  IsUrl,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const HEX_MESSAGE = 'must be a hex color like #1A2B3C or #FFF';
@@ -16,12 +24,12 @@ export class CreateBrandKitDto {
   @MaxLength(100)
   BrandName: string;
 
-  @ApiProperty({ example: '#6F4E37' })
+  @ApiProperty({ example: '#FFFFFF' })
   @IsString()
   @Matches(HEX_COLOR, { message: `PrimaryColor ${HEX_MESSAGE}` })
   PrimaryColor: string;
 
-  @ApiProperty({ example: '#F5E6CC' })
+  @ApiProperty({ example: '#FFFFFF' })
   @IsString()
   @Matches(HEX_COLOR, { message: `SecondaryColor ${HEX_MESSAGE}` })
   SecondaryColor: string;
@@ -31,8 +39,8 @@ export class CreateBrandKitDto {
   @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   LogoURL: string;
 
-  @ApiProperty({ example: 1 })
-  @Transform(trim)
-  @IsNotEmpty()
+  @ApiProperty({ example: 1, description: 'Id of the creating user' })
+  @IsInt()
+  @IsPositive()
   createdBy: number;
 }

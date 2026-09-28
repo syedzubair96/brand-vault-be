@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BrandFolderController } from './brand-folder.controller.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { BrandFolderService } from './brand-folder.service.js';
 
 describe('BrandFolderController', () => {
@@ -8,7 +9,7 @@ describe('BrandFolderController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BrandFolderController],
-      providers: [BrandFolderService],
+      providers: [BrandFolderService, { provide: PrismaService, useValue: {} }],
     }).compile();
 
     controller = module.get<BrandFolderController>(BrandFolderController);

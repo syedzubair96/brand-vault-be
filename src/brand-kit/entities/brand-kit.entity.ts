@@ -16,6 +16,9 @@ export class BrandKit {
   @ApiProperty({ example: 'https://example.com/logo.png' })
   LogoURL: string;
 
+  @ApiProperty({ example: 1 })
+  createdBy: number;
+
   @ApiProperty()
   createdAt: Date;
 

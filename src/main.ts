@@ -16,7 +16,7 @@ async function bootstrap() {
 
   const options = new DocumentBuilder()
     .setTitle('Brand Vault API')
-    .setDescription('Brand Vault API description')
+    .setDescription('Brand Vault API')
     .setVersion('1.0')
     .addTag('Brand Vault')
     .build();
