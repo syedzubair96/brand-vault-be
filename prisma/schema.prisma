@@ -45,9 +45,11 @@ model Assets {
   name                  String    @unique
   type                  Int       
   LogoURL               String
+  FolderId              Int
   createdAt             DateTime  @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime  @updatedAt
   deletedAt             DateTime?
+  createdBy             Int
   tags                  String?
   description           String?
   usage_suggestion      String?

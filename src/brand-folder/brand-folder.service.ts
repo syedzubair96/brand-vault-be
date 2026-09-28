@@ -83,6 +83,15 @@ export class BrandFolderService {
       );
     }
 
+    const assetCount = await this.prisma.assets.count({
+      where: { FolderId: id, deletedAt: null },
+    });
+    if (assetCount > 0) {
+      throw new ConflictException(
+        `Folder ${id} still has ${assetCount} asset(s); move or trash them first`,
+      );
+    }
+
     return this.prisma.assetFolder.update({
       where: { id },
       data: { deletedAt: new Date() },
