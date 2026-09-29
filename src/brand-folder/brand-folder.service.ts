@@ -14,10 +14,10 @@ import { UpdateBrandFolderDto } from './dto/update-brand-folder.dto.js';
 export class BrandFolderService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateBrandFolderDto) {
+  async create(userId: number, dto: CreateBrandFolderDto) {
     const headFolderId = dto.HeadFolderId ?? null;
     if (headFolderId !== null) {
-      await this.checkParentFolder(headFolderId, dto.createdBy);
+      await this.checkParentFolder(userId, headFolderId);
     }
 
     try {
@@ -25,7 +25,7 @@ export class BrandFolderService {
         data: {
           FolderName: dto.FolderName,
           HeadFolderId: headFolderId,
-          createdBy: dto.createdBy,
+          createdBy: userId,
         },
       });
     } catch (error) {
@@ -33,32 +33,32 @@ export class BrandFolderService {
     }
   }
 
-  findAll(query: ListBrandFoldersDto) {
+  findAll(userId: number, query: ListBrandFoldersDto) {
     return this.prisma.assetFolder.findMany({
       where: {
-        deletedAt: null,
-        createdBy: query.createdBy,
+        deletedAt: query.trash ? { not: null } : null,
+        createdBy: userId,
         HeadFolderId: query.topLevel ? null : query.headFolderId,
       },
-      orderBy: { FolderName: 'asc' },
+      orderBy: query.trash ? { deletedAt: 'desc' } : { FolderName: 'asc' },
     });
   }
 
-  async findOne(id: number) {
-    const folder = await this.findActive(id);
+  async findOne(userId: number, id: number) {
+    const folder = await this.findActive(userId, id);
     if (!folder) {
       throw new NotFoundException(`Folder ${id} not found`);
     }
     return folder;
   }
 
-  async update(id: number, dto: UpdateBrandFolderDto) {
-    const folder = await this.findOne(id);
+  async update(userId: number, id: number, dto: UpdateBrandFolderDto) {
+    const folder = await this.findOne(userId, id);
 
     const newParentId = dto.HeadFolderId;
     if (newParentId != null && newParentId !== folder.HeadFolderId) {
       await this.checkNotOwnDescendant(id, newParentId);
-      await this.checkParentFolder(newParentId, folder.createdBy);
+      await this.checkParentFolder(userId, newParentId);
     }
 
     try {
@@ -71,8 +71,8 @@ export class BrandFolderService {
     }
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(userId: number, id: number) {
+    await this.findOne(userId, id);
 
     const childCount = await this.prisma.assetFolder.count({
       where: { HeadFolderId: id, deletedAt: null },
@@ -98,13 +98,73 @@ export class BrandFolderService {
     });
   }
 
-  private findActive(id: number) {
-    return this.prisma.assetFolder.findFirst({ where: { id, deletedAt: null } });
+  async restore(userId: number, id: number) {
+    const folder = await this.findTrashed(userId, id);
+
+    if (folder.HeadFolderId !== null) {
+      const parent = await this.findActive(userId, folder.HeadFolderId);
+      if (!parent) {
+        throw new ConflictException(
+          `Folder ${id} is inside a deleted folder; restore the parent folder first`,
+        );
+      }
+    }
+
+    return this.prisma.assetFolder.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
   }
 
-  private async checkParentFolder(parentId: number, ownerId: number) {
-    const parent = await this.findActive(parentId);
-    if (!parent || parent.createdBy !== ownerId) {
+  async removePermanently(userId: number, id: number) {
+    await this.findTrashed(userId, id);
+
+    const childCount = await this.prisma.assetFolder.count({ where: { HeadFolderId: id } });
+    if (childCount > 0) {
+      throw new ConflictException(
+        `Folder ${id} still has ${childCount} subfolder(s); delete them permanently first`,
+      );
+    }
+
+    const activeAssetCount = await this.prisma.assets.count({
+      where: { FolderId: id, deletedAt: null },
+    });
+    if (activeAssetCount > 0) {
+      throw new ConflictException(
+        `Folder ${id} still has ${activeAssetCount} asset(s); move or trash them first`,
+      );
+    }
+
+    // Assets.FolderId is required, so trashed assets can't outlive their folder.
+    const [, folder] = await this.prisma.$transaction([
+      this.prisma.assets.deleteMany({ where: { FolderId: id, createdBy: userId } }),
+      this.prisma.assetFolder.delete({ where: { id } }),
+    ]);
+    return folder;
+  }
+
+  private async findTrashed(userId: number, id: number) {
+    const folder = await this.prisma.assetFolder.findFirst({
+      where: { id, createdBy: userId },
+    });
+    if (!folder) {
+      throw new NotFoundException(`Folder ${id} not found`);
+    }
+    if (folder.deletedAt === null) {
+      throw new ConflictException(`Folder ${id} is not deleted`);
+    }
+    return folder;
+  }
+
+  private findActive(userId: number, id: number) {
+    return this.prisma.assetFolder.findFirst({
+      where: { id, createdBy: userId, deletedAt: null },
+    });
+  }
+
+  private async checkParentFolder(userId: number, parentId: number) {
+    const parent = await this.findActive(userId, parentId);
+    if (!parent) {
       throw new BadRequestException(`Parent folder ${parentId} not found`);
     }
   }

@@ -4,7 +4,6 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
-  IsOptional,
   IsPositive,
   IsString,
   IsUrl,
@@ -43,9 +42,4 @@ export class CreateAssetDto {
   @IsInt()
   @IsPositive()
   FolderId: number ;
-
-  @ApiProperty({ example: 1, description: 'Temporary until auth: id of the owning user' })
-  @IsInt()
-  @IsPositive()
-  createdBy: number;
 }

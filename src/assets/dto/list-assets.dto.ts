@@ -17,13 +17,6 @@ const toBoolean = ({ value }: { value: unknown }) =>
   value === 'true' ? true : value === 'false' ? false : value;
 
 export class ListAssetsDto {
-  @ApiPropertyOptional({ example: 1, description: 'Only assets owned by this user' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @IsPositive()
-  createdBy?: number;
-
   @ApiPropertyOptional({ example: 1, description: 'Only assets in this folder' })
   @IsOptional()
   @Type(() => Number)

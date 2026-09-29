@@ -30,9 +30,4 @@ export class CreateBrandFolderDto {
   @IsInt()
   @IsPositive()
   HeadFolderId?: number | null;
-
-  @ApiProperty({ example: 1, description: 'Id of the creating user' })
-  @IsInt()
-  @IsPositive()
-  createdBy: number;
 }

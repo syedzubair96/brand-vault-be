@@ -4,18 +4,24 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AssetTaggingService } from '../ai/asset-tagging.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ASSET_TYPES } from './asset-types.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { ListAssetsDto } from './dto/list-assets.dto.js';
+import { SaveAiMetadataDto } from './dto/save-ai-metadata.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
 
 @Injectable()
 export class AssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly assetTagging: AssetTaggingService,
+  ) {}
 
-  async create(dto: CreateAssetDto) {
-    await this.checkFolder(dto.FolderId, dto.createdBy);
+  async create(userId: number, dto: CreateAssetDto) {
+    await this.checkFolder(userId, dto.FolderId);
     try {
       return await this.prisma.assets.create({
         data: {
@@ -23,7 +29,7 @@ export class AssetsService {
           type: dto.type,
           LogoURL: dto.LogoURL,
           FolderId: dto.FolderId,
-          createdBy: dto.createdBy,
+          createdBy: userId,
         },
       });
     } catch (error) {
@@ -31,11 +37,11 @@ export class AssetsService {
     }
   }
 
-  findAll(query: ListAssetsDto) {
+  findAll(userId: number, query: ListAssetsDto) {
     return this.prisma.assets.findMany({
       where: {
         deletedAt: query.trash ? { not: null } : null,
-        createdBy: query.createdBy,
+        createdBy: userId,
         FolderId: query.folderId,
         name: query.q ? { contains: query.q, mode: 'insensitive' } : undefined,
       },
@@ -43,19 +49,21 @@ export class AssetsService {
     });
   }
 
-  async findOne(id: number) {
-    const asset = await this.prisma.assets.findFirst({ where: { id, deletedAt: null } });
+  async findOne(userId: number, id: number) {
+    const asset = await this.prisma.assets.findFirst({
+      where: { id, createdBy: userId, deletedAt: null },
+    });
     if (!asset) {
       throw new NotFoundException(`Asset ${id} not found`);
     }
     return asset;
   }
 
-  async update(id: number, dto: UpdateAssetDto) {
-    const asset = await this.findOne(id);
+  async update(userId: number, id: number, dto: UpdateAssetDto) {
+    const asset = await this.findOne(userId, id);
 
     if (dto.FolderId != null && dto.FolderId !== asset.FolderId) {
-      await this.checkFolder(dto.FolderId, asset.createdBy);
+      await this.checkFolder(userId, dto.FolderId);
     }
 
     try {
@@ -73,16 +81,16 @@ export class AssetsService {
     }
   }
 
-  async trash(id: number) {
-    await this.findOne(id);
+  async trash(userId: number, id: number) {
+    await this.findOne(userId, id);
     return this.prisma.assets.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
   }
 
-  async restore(id: number) {
-    const asset = await this.findTrashed(id);
+  async restore(userId: number, id: number) {
+    const asset = await this.findTrashed(userId, id);
 
     return this.prisma.assets.update({
       where: { id },
@@ -90,13 +98,57 @@ export class AssetsService {
     });
   }
 
-  async remove(id: number) {
-    await this.findTrashed(id);
+  async remove(userId: number, id: number) {
+    await this.findTrashed(userId, id);
     return this.prisma.assets.delete({ where: { id } });
   }
 
-  private async findTrashed(id: number) {
-    const asset = await this.prisma.assets.findUnique({ where: { id } });
+  async suggestAiMetadata(userId: number, id: number) {
+    const asset = await this.findOne(userId, id);
+    const [folder, brandKit] = await Promise.all([
+      this.prisma.assetFolder.findFirst({
+        where: { id: asset.FolderId, createdBy: userId, deletedAt: null },
+        select: { FolderName: true },
+      }),
+      this.prisma.brandKit.findFirst({
+        where: { createdBy: userId },
+        orderBy: { updatedAt: 'desc' },
+        select: { BrandName: true, PrimaryColor: true, SecondaryColor: true },
+      }),
+    ]);
+
+    return this.assetTagging.suggest({
+      asset: {
+        name: asset.name,
+        type: ASSET_TYPES[asset.type as keyof typeof ASSET_TYPES] ?? 'unknown',
+        url: asset.LogoURL,
+      },
+      folder: folder ? { name: folder.FolderName } : null,
+      brand: brandKit
+        ? {
+            name: brandKit.BrandName,
+            primary_color: brandKit.PrimaryColor,
+            secondary_color: brandKit.SecondaryColor,
+          }
+        : null,
+    });
+  }
+
+  /** Saves a suggestion the user has reviewed (and possibly edited). */
+  async saveAiMetadata(userId: number, id: number, dto: SaveAiMetadataDto) {
+    await this.findOne(userId, id);
+    return this.prisma.assets.update({
+      where: { id },
+      data: {
+        tags: dto.tags.join(', '),
+        description: dto.description,
+        usage_suggestion: dto.usage_suggestion,
+      },
+    });
+  }
+
+  private async findTrashed(userId: number, id: number) {
+    const asset = await this.prisma.assets.findFirst({ where: { id, createdBy: userId } });
     if (!asset) {
       throw new NotFoundException(`Asset ${id} not found`);
     }
@@ -106,11 +158,11 @@ export class AssetsService {
     return asset;
   }
 
-  private async checkFolder(folderId: number, ownerId: number) {
+  private async checkFolder(userId: number, folderId: number) {
     const folder = await this.prisma.assetFolder.findFirst({
-      where: { id: folderId, deletedAt: null },
+      where: { id: folderId, createdBy: userId, deletedAt: null },
     });
-    if (!folder || folder.createdBy !== ownerId) {
+    if (!folder) {
       throw new BadRequestException(`Folder ${folderId} not found`);
     }
   }

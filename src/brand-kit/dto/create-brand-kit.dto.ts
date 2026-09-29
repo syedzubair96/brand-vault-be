@@ -1,14 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsInt,
-  IsNotEmpty,
-  IsPositive,
-  IsString,
-  IsUrl,
-  Matches,
-  MaxLength,
-} from 'class-validator';
+import { IsNotEmpty, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const HEX_MESSAGE = 'must be a hex color like #1A2B3C or #FFF';
@@ -38,9 +30,4 @@ export class CreateBrandKitDto {
   @Transform(trim)
   @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   LogoURL: string;
-
-  @ApiProperty({ example: 1, description: 'Id of the creating user' })
-  @IsInt()
-  @IsPositive()
-  createdBy: number;
 }

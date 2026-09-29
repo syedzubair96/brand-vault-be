@@ -8,27 +8,41 @@ import { UpdateBrandKitDto } from './dto/update-brand-kit.dto.js';
 export class BrandKitService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateBrandKitDto) {
+  async create(userId: number, dto: CreateBrandKitDto) {
     try {
-      return await this.prisma.brandKit.create({ data: dto });
+      return await this.prisma.brandKit.create({
+        data: {
+          BrandName: dto.BrandName,
+          PrimaryColor: dto.PrimaryColor,
+          SecondaryColor: dto.SecondaryColor,
+          LogoURL: dto.LogoURL,
+          createdBy: userId,
+        },
+      });
     } catch (error) {
       this.handleKnownErrors(error);
     }
   }
 
-  findAll() {
-    return this.prisma.brandKit.findMany({ orderBy: { updatedAt: 'desc' } });
+  findAll(userId: number) {
+    return this.prisma.brandKit.findMany({
+      where: { createdBy: userId },
+      orderBy: { updatedAt: 'desc' },
+    });
   }
 
-  async findOne(id: number) {
-    const brandKit = await this.prisma.brandKit.findUnique({ where: { id } });
+  async findOne(userId: number, id: number) {
+    const brandKit = await this.prisma.brandKit.findFirst({
+      where: { id, createdBy: userId },
+    });
     if (!brandKit) {
       throw new NotFoundException(`Brand kit ${id} not found`);
     }
     return brandKit;
   }
 
-  async update(id: number, dto: UpdateBrandKitDto) {
+  async update(userId: number, id: number, dto: UpdateBrandKitDto) {
+    await this.findOne(userId, id);
     try {
       return await this.prisma.brandKit.update({ where: { id }, data: dto });
     } catch (error) {
@@ -36,7 +50,8 @@ export class BrandKitService {
     }
   }
 
-  async remove(id: number) {
+  async remove(userId: number, id: number) {
+    await this.findOne(userId, id);
     try {
       return await this.prisma.brandKit.delete({ where: { id } });
     } catch (error) {
